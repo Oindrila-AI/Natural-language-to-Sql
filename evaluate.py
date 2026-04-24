@@ -4,7 +4,7 @@ import json
 import os
 from typing import Dict, List
 
-import evaluate
+import sacrebleu
 import torch
 from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
@@ -47,11 +47,10 @@ def generate_predictions(
 
 def compute_metrics(predictions: List[str], references: List[str]) -> Dict[str, float]:
     """Compute EM, BLEU, and token-level accuracy."""
-    bleu_metric = evaluate.load("sacrebleu")
     normalized_preds = [normalize_sql(pred) for pred in predictions]
     normalized_refs = [normalize_sql(ref) for ref in references]
     exact_match = sum(pred == ref for pred, ref in zip(normalized_preds, normalized_refs)) / max(len(predictions), 1)
-    bleu = bleu_metric.compute(predictions=predictions, references=[[ref] for ref in references])["score"]
+    bleu = sacrebleu.corpus_bleu(predictions, [references]).score
     token_acc = token_level_accuracy(predictions, references)
     return {
         "exact_match_percent": round(exact_match * 100, 4),

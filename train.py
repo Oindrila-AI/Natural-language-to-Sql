@@ -3,8 +3,8 @@
 import os
 from typing import Dict
 
-import evaluate
 import numpy as np
+import sacrebleu
 import torch
 from transformers import (
     AutoModelForSeq2SeqLM,
@@ -38,8 +38,6 @@ def print_gpu_memory() -> None:
 
 def build_compute_metrics(tokenizer):
     """Create the compute_metrics function used by the trainer."""
-    bleu_metric = evaluate.load("sacrebleu")
-
     def compute_metrics(eval_preds) -> Dict[str, float]:
         predictions, labels = eval_preds
         if isinstance(predictions, tuple):
@@ -55,7 +53,7 @@ def build_compute_metrics(tokenizer):
         exact_match = sum(pred == label for pred, label in zip(normalized_preds, normalized_labels)) / max(
             len(normalized_preds), 1
         )
-        bleu = bleu_metric.compute(predictions=decoded_preds, references=[[label] for label in decoded_labels])["score"]
+        bleu = sacrebleu.corpus_bleu(decoded_preds, [decoded_labels]).score
         token_acc = token_level_accuracy(decoded_preds, decoded_labels)
 
         return {
