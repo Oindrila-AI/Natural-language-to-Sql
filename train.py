@@ -93,9 +93,12 @@ def main() -> None:
     """Run end-to-end training and save the best checkpoint."""
     set_seed(config.SEED)
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
+    if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
+        tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME, use_fast=config.USE_FAST_TOKENIZER)
         model = AutoModelForSeq2SeqLM.from_pretrained(config.MODEL_NAME)
     except Exception as exc:
         raise SystemExit(f"Model/tokenizer loading failed: {exc}") from exc
@@ -109,7 +112,14 @@ def main() -> None:
     except Exception as exc:
         raise SystemExit(f"Dataset loading failed: {exc}") from exc
 
-    data_collator = DataCollatorForSeq2Seq(tokenizer=tokenizer, model=model)
+    data_collator = DataCollatorForSeq2Seq(
+        tokenizer=tokenizer,
+        model=model,
+        label_pad_token_id=-100,
+        pad_to_multiple_of=8 if torch.cuda.is_available() else None,
+    )
+
+    optim_name = "adamw_torch_fused" if torch.cuda.is_available() else "adamw_torch"
 
     training_args = Seq2SeqTrainingArguments(
         output_dir=str(config.OUTPUT_DIR),
@@ -135,6 +145,13 @@ def main() -> None:
         run_name=config.WANDB_RUN_NAME,
         logging_dir=str(config.OUTPUT_DIR / "logs"),
         seed=config.SEED,
+        dataloader_num_workers=config.DATALOADER_NUM_WORKERS,
+        dataloader_pin_memory=config.PIN_MEMORY,
+        dataloader_persistent_workers=config.PERSISTENT_WORKERS,
+        eval_accumulation_steps=config.EVAL_ACCUMULATION_STEPS,
+        group_by_length=config.GROUP_BY_LENGTH,
+        length_column_name="length",
+        optim=optim_name,
     )
 
     trainer = Seq2SeqTrainer(
@@ -166,4 +183,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

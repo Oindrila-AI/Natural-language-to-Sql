@@ -17,7 +17,7 @@ def build_input_text(question: str, column_headers: List[str]) -> str:
 def generate_sql(question: str, column_headers: List[str], checkpoint_path: str = str(config.BEST_MODEL_DIR)) -> str:
     """Load a trained checkpoint and generate SQL for one question."""
     try:
-        tokenizer = AutoTokenizer.from_pretrained(checkpoint_path)
+        tokenizer = AutoTokenizer.from_pretrained(checkpoint_path, use_fast=config.USE_FAST_TOKENIZER)
         model = AutoModelForSeq2SeqLM.from_pretrained(checkpoint_path)
     except Exception as exc:
         raise RuntimeError(f"Failed to load checkpoint from {checkpoint_path}: {exc}") from exc
@@ -56,4 +56,3 @@ if __name__ == "__main__":
         print("Generated SQL:", prediction)
     except Exception as exc:
         raise SystemExit(f"Inference failed: {exc}") from exc
-

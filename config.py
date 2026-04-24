@@ -13,6 +13,8 @@ MODEL_NAME = "Salesforce/codet5-base"
 OUTPUT_DIR = PROJECT_ROOT / "outputs" / "codet5_text2sql"
 BEST_MODEL_DIR = OUTPUT_DIR / "best_checkpoint"
 EVAL_RESULTS_FILE = OUTPUT_DIR / "evaluation_results.json"
+RAW_DATASET_CACHE_DIR = OUTPUT_DIR / "dataset_cache" / "raw"
+TOKENIZED_DATASET_CACHE_DIR = OUTPUT_DIR / "dataset_cache" / "tokenized"
 
 WANDB_PROJECT = "codet5-text2sql"
 WANDB_RUN_NAME = "codet5-base-wikisql"
@@ -41,4 +43,10 @@ METRIC_FOR_BEST_MODEL = "eval_loss"
 GREATER_IS_BETTER = False
 SEED = 42
 PREPROCESSING_NUM_WORKERS = 1
-
+DATALOADER_NUM_WORKERS = 2
+EVAL_ACCUMULATION_STEPS = 8
+GROUP_BY_LENGTH = True
+USE_FAST_TOKENIZER = True
+PAD_TO_MAX_LENGTH = False
+PIN_MEMORY = True
+PERSISTENT_WORKERS = True

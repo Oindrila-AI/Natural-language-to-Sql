@@ -1,11 +1,12 @@
 """Dataset utilities for CodeT5 text-to-SQL fine-tuning."""
 
 import ast
+import os
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
-from datasets import Dataset, DatasetDict
+from datasets import Dataset, DatasetDict, load_from_disk
 from transformers import AutoTokenizer
 
 import config
@@ -154,36 +155,59 @@ def load_split(csv_path: Path) -> Dataset:
 
 def tokenize_batch(examples: Dict[str, List[str]], tokenizer: AutoTokenizer) -> Dict[str, List[List[int]]]:
     """Tokenize model inputs and labels for seq2seq training."""
+    padding = "max_length" if config.PAD_TO_MAX_LENGTH else False
     model_inputs = tokenizer(
         examples["input_text"],
         max_length=config.MAX_INPUT_LENGTH,
-        padding="max_length",
+        padding=padding,
         truncation=True,
     )
     labels = tokenizer(
         text_target=examples["target_text"],
         max_length=config.MAX_TARGET_LENGTH,
-        padding="max_length",
+        padding=padding,
         truncation=True,
     )
     model_inputs["labels"] = labels["input_ids"]
+    model_inputs["length"] = [len(input_ids) for input_ids in model_inputs["input_ids"]]
     return model_inputs
 
 
 def get_raw_datasets() -> DatasetDict:
     """Load train, validation, and test splits without tokenization."""
-    return DatasetDict(
+    cache_dir = config.RAW_DATASET_CACHE_DIR
+    if cache_dir.exists():
+        try:
+            return load_from_disk(str(cache_dir))
+        except Exception:
+            pass
+
+    raw_datasets = DatasetDict(
         {
             "train": load_split(config.TRAIN_FILE),
             "validation": load_split(config.VALIDATION_FILE),
             "test": load_split(config.TEST_FILE),
         }
     )
+    os.makedirs(cache_dir.parent, exist_ok=True)
+    try:
+        raw_datasets.save_to_disk(str(cache_dir))
+    except Exception:
+        pass
+    return raw_datasets
 
 
 def get_tokenized_datasets(tokenizer: AutoTokenizer) -> Tuple[DatasetDict, DatasetDict]:
     """Load raw datasets and return tokenized copies for training and evaluation."""
     raw_datasets = get_raw_datasets()
+    tokenized_cache_dir = config.TOKENIZED_DATASET_CACHE_DIR
+    if tokenized_cache_dir.exists():
+        try:
+            tokenized = load_from_disk(str(tokenized_cache_dir))
+            return raw_datasets, tokenized
+        except Exception:
+            pass
+
     tokenized = raw_datasets.map(
         lambda batch: tokenize_batch(batch, tokenizer),
         batched=True,
@@ -191,12 +215,17 @@ def get_tokenized_datasets(tokenizer: AutoTokenizer) -> Tuple[DatasetDict, Datas
         num_proc=config.PREPROCESSING_NUM_WORKERS,
         desc="Tokenizing dataset",
     )
+    os.makedirs(tokenized_cache_dir.parent, exist_ok=True)
+    try:
+        tokenized.save_to_disk(str(tokenized_cache_dir))
+    except Exception:
+        pass
     return raw_datasets, tokenized
 
 
 if __name__ == "__main__":
     try:
-        tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME)
+        tokenizer = AutoTokenizer.from_pretrained(config.MODEL_NAME, use_fast=config.USE_FAST_TOKENIZER)
         raw, tokenized = get_tokenized_datasets(tokenizer)
         print("Raw dataset sizes:", {split: len(ds) for split, ds in raw.items()})
         print("Tokenized columns:", tokenized["train"].column_names)

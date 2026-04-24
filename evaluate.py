@@ -84,9 +84,12 @@ def compute_metrics(predictions: List[str], references: List[str]) -> Dict[str, 
 def main() -> None:
     """Load the best checkpoint, evaluate on test data, and save results."""
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
+    if torch.cuda.is_available():
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(str(config.BEST_MODEL_DIR))
+        tokenizer = AutoTokenizer.from_pretrained(str(config.BEST_MODEL_DIR), use_fast=config.USE_FAST_TOKENIZER)
         model = AutoModelForSeq2SeqLM.from_pretrained(str(config.BEST_MODEL_DIR))
     except Exception as exc:
         raise SystemExit(
@@ -138,4 +141,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
