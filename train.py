@@ -1,12 +1,11 @@
 """Train CodeT5-base for text-to-SQL generation."""
 
 import os
-from typing import Dict, List
+from typing import Dict
 
 import evaluate
 import numpy as np
 import torch
-import wandb
 from transformers import (
     AutoModelForSeq2SeqLM,
     AutoTokenizer,
@@ -19,6 +18,7 @@ from transformers import (
 
 import config
 from dataset import get_tokenized_datasets
+from utils import normalize_sql, token_level_accuracy
 
 
 def print_gpu_memory() -> None:
@@ -34,28 +34,6 @@ def print_gpu_memory() -> None:
         )
     else:
         print("GPU is not available. Training will run on CPU, which will be very slow.")
-
-
-def normalize_sql(text: str) -> str:
-    """Normalize SQL strings for exact-match comparison."""
-    return " ".join(text.strip().lower().split())
-
-
-def token_level_accuracy(predictions: List[str], references: List[str]) -> float:
-    """Compute average token-level accuracy across prediction-reference pairs."""
-    accuracies: List[float] = []
-    for prediction, reference in zip(predictions, references):
-        pred_tokens = prediction.strip().split()
-        ref_tokens = reference.strip().split()
-        max_len = max(len(pred_tokens), len(ref_tokens))
-        if max_len == 0:
-            accuracies.append(1.0)
-            continue
-        matches = sum(
-            1 for pred_token, ref_token in zip(pred_tokens, ref_tokens) if pred_token.lower() == ref_token.lower()
-        )
-        accuracies.append(matches / max_len)
-    return float(sum(accuracies) / len(accuracies)) if accuracies else 0.0
 
 
 def build_compute_metrics(tokenizer):
@@ -91,6 +69,7 @@ def build_compute_metrics(tokenizer):
 
 def main() -> None:
     """Run end-to-end training and save the best checkpoint."""
+    os.environ.setdefault("WANDB_MODE", "offline")
     set_seed(config.SEED)
     os.makedirs(config.OUTPUT_DIR, exist_ok=True)
     if torch.cuda.is_available():
@@ -106,6 +85,13 @@ def main() -> None:
     if config.GRADIENT_CHECKPOINTING:
         model.gradient_checkpointing_enable()
         model.config.use_cache = False
+
+    if hasattr(torch, "compile"):
+        try:
+            model = torch.compile(model)
+            print("torch.compile enabled.")
+        except Exception:
+            print("torch.compile not available, continuing without it.")
 
     try:
         _, tokenized_datasets = get_tokenized_datasets(tokenizer)
@@ -136,7 +122,7 @@ def main() -> None:
         fp16=config.FP16,
         predict_with_generate=config.PREDICT_WITH_GENERATE,
         generation_max_length=config.MAX_TARGET_LENGTH,
-        generation_num_beams=config.NUM_BEAMS,
+        generation_num_beams=config.TRAIN_NUM_BEAMS,
         load_best_model_at_end=config.LOAD_BEST_MODEL_AT_END,
         metric_for_best_model=config.METRIC_FOR_BEST_MODEL,
         greater_is_better=config.GREATER_IS_BETTER,
@@ -168,7 +154,6 @@ def main() -> None:
     print_gpu_memory()
 
     try:
-        wandb.init(project=config.WANDB_PROJECT, name=config.WANDB_RUN_NAME)
         trainer.train()
         trainer.save_model(str(config.BEST_MODEL_DIR))
         tokenizer.save_pretrained(str(config.BEST_MODEL_DIR))
@@ -176,9 +161,6 @@ def main() -> None:
         print("Validation metrics:", metrics)
     except Exception as exc:
         raise SystemExit(f"Training failed: {exc}") from exc
-    finally:
-        if wandb.run is not None:
-            wandb.finish()
 
 
 if __name__ == "__main__":

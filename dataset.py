@@ -2,6 +2,7 @@
 
 import ast
 import os
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -73,8 +74,9 @@ def _split_top_level_dtype(text: str) -> str:
             paren_depth += 1
         elif char == ")":
             paren_depth -= 1
-        elif text.startswith(", dtype=", index) and bracket_depth == 0 and paren_depth == 0:
-            return text[:index]
+        elif bracket_depth == 0 and paren_depth == 0:
+            if re.match(r"^,?[ \t\n\r]*dtype=", text[index:]):
+                return text[:index]
 
     return text
 
@@ -110,7 +112,7 @@ def safe_literal_parse(value: str) -> Optional[dict]:
 def build_model_input(question: str, headers: List[str]) -> str:
     """Create the encoder input string from a question and table headers."""
     header_text = " | ".join(str(header).strip() for header in headers if str(header).strip())
-    return f"question: {question.strip()} context: {header_text}"
+    return f"translate English to SQL: question: {question.strip()} context: {header_text}"
 
 
 def parse_example(row: pd.Series) -> Optional[Dict[str, str]]:

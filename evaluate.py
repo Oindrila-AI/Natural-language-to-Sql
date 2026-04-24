@@ -10,28 +10,7 @@ from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
 
 import config
 from dataset import get_raw_datasets
-
-
-def normalize_sql(text: str) -> str:
-    """Normalize SQL strings for stable comparison."""
-    return " ".join(text.strip().lower().split())
-
-
-def token_level_accuracy(predictions: List[str], references: List[str]) -> float:
-    """Compute average token-level accuracy across predictions."""
-    scores: List[float] = []
-    for prediction, reference in zip(predictions, references):
-        pred_tokens = prediction.strip().split()
-        ref_tokens = reference.strip().split()
-        max_len = max(len(pred_tokens), len(ref_tokens))
-        if max_len == 0:
-            scores.append(1.0)
-            continue
-        matches = sum(
-            1 for pred_token, ref_token in zip(pred_tokens, ref_tokens) if pred_token.lower() == ref_token.lower()
-        )
-        scores.append(matches / max_len)
-    return float(sum(scores) / len(scores)) if scores else 0.0
+from utils import normalize_sql, token_level_accuracy
 
 
 def generate_predictions(
@@ -58,7 +37,7 @@ def generate_predictions(
             generated = model.generate(
                 **encoded,
                 max_length=config.MAX_TARGET_LENGTH,
-                num_beams=config.NUM_BEAMS,
+                num_beams=config.EVAL_NUM_BEAMS,
                 early_stopping=True,
             )
         predictions.extend(tokenizer.batch_decode(generated, skip_special_tokens=True))
