@@ -1,0 +1,44 @@
+"""Central configuration for CodeT5 text-to-SQL fine-tuning."""
+
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parent
+DATA_DIR = PROJECT_ROOT / "archive (2)"
+TRAIN_FILE = DATA_DIR / "train.csv"
+VALIDATION_FILE = DATA_DIR / "validation.csv"
+TEST_FILE = DATA_DIR / "test.csv"
+
+MODEL_NAME = "Salesforce/codet5-base"
+OUTPUT_DIR = PROJECT_ROOT / "outputs" / "codet5_text2sql"
+BEST_MODEL_DIR = OUTPUT_DIR / "best_checkpoint"
+EVAL_RESULTS_FILE = OUTPUT_DIR / "evaluation_results.json"
+
+WANDB_PROJECT = "codet5-text2sql"
+WANDB_RUN_NAME = "codet5-base-wikisql"
+REPORT_TO = ["wandb"]
+
+MAX_INPUT_LENGTH = 512
+MAX_TARGET_LENGTH = 128
+LEARNING_RATE = 5e-5
+WARMUP_STEPS = 500
+TRAIN_BATCH_SIZE = 8
+EVAL_BATCH_SIZE = 8
+GRADIENT_ACCUMULATION_STEPS = 4
+NUM_TRAIN_EPOCHS = 15
+WEIGHT_DECAY = 0.01
+NUM_BEAMS = 4
+FP16 = True
+GRADIENT_CHECKPOINTING = True
+EARLY_STOPPING_PATIENCE = 3
+SAVE_TOTAL_LIMIT = 2
+LOGGING_STEPS = 50
+EVAL_STRATEGY = "epoch"
+SAVE_STRATEGY = "epoch"
+PREDICT_WITH_GENERATE = True
+LOAD_BEST_MODEL_AT_END = True
+METRIC_FOR_BEST_MODEL = "eval_loss"
+GREATER_IS_BETTER = False
+SEED = 42
+PREPROCESSING_NUM_WORKERS = 1
+

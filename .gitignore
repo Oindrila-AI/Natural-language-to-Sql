@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+
+archive (2)/
+archive (2).zip
+
+outputs/
+wandb/
